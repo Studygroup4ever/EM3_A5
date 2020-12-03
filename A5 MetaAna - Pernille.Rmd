@@ -16,14 +16,6 @@ knitr::opts_chunk$set(echo = TRUE)
 
 N.B. Only measures of pitch mean and pitch sd are required for the assignment (all the other measures have been removed from the data-set for the sake of simplicity). 
 
-```{r}
-pacman::p_load(readxl,tidyverse,tidyr, lmerTest, lme4,metafor)
-
-df <- read_xlsx("Matrix_MetaAnalysis_Diagnosis_updated290719.xlsx")
-
-View(df)
-```
-
 2. Do the results match your own analysis from Assignment 3? If you add your results to the meta-analysis, do the estimated effect sizes change? Report the new estimates and the new forest plots.
 
 3. Assess the quality of the literature: report and comment on heterogeneity of the studies (tau, I2), on publication bias (funnel plot), and on influential studies.
@@ -35,88 +27,140 @@ Data: https://www.dropbox.com/s/0l9ur0gaabr80a8/Matrix_MetaAnalysis_Diagnosis_up
 Prisma chart: https://www.dropbox.com/s/vbjf6ff73dv9tru/PRISMA%202009%20flow%20diagram_PP.pptx?dl=0 
 - Look through the dataset to find out which columns to use, and if there is any additional information written as comments (real world data is always messy!).
     * Hint: PITCH_F0M and PITCH_F0SD group of variables are what you need
-```{r}
+- Following the procedure in the slides calculate effect size and standard error of the effect size per each study. N.B. we focus on pitch mean (PITCH_F0_HC_M),(PITCH_F0_SZ_M) and pitch standard deviation (PITCH_F0SD_HC_M),(PITCH_F0SD_SZ_M).
+ . first try using lmer (to connect to what you know of mixed effects models)
+ . then use rma() (to get some juicy additional statistics)
+ 
+- Build a forest plot of the results (forest(model))
+ 
+- Go back to Assignment 3, add your own study to the data table, and re-run meta-analysis. Do the results change?
 
-# Sørens
-df_sub <- df %>% select(StudyID,
-                        PITCH_F0_HC_M,
-                        PITCH_F0_SZ_M,
-                        PITCH_F0SD_HC_M,
-                        PITCH_F0SD_SZ_M, 
-                        SAMPLE_SIZE_HC, SAMPLE_SIZE_SZ, PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0SD_HC_M
-                        )
+- Now look at the output of rma() and check tau and I2
+
+```{r}
+# Setup
+pacman::p_load(readxl,tidyverse,tidyr, lmerTest, lme4,metafor)
+
+# Read in excel file
+df <- read_xlsx("Matrix_MetaAnalysis_Diagnosis_updated290719.xlsx")
+
+# Counting how long the columns are without NA's
 df %>% summarise(
   PitchF0HC = length(na.omit(PITCH_F0_HC_M)),
   PitchF0SZ = length(na.omit(PITCH_F0_SZ_M)),
   PitchF0SDHC = length(na.omit(PITCH_F0SD_HC_M)),
   PitchF0SDSZ = length(na.omit(PITCH_F0SD_SZ_M))
   )
+```
+So, we have 6 complete case-studies for Pitch-mean in healthy controls, 10 complete ones in Pitch-mean in schizophrenics, 15 complete ones in Pitch-standard-deviation-mean in healthy controls (there will be overlap with the 6) and then 20 complete ones in Pitch-standard-deviation mean in schizophrenics (again, there will be overlap here with the 10).
 
-df1 <- df %>% filter(PITCH_F0_HC_M != is.na(PITCH_F0_HC_M) | PITCH_F0SD_HC_M != is.na(PITCH_F0SD_HC_M)) # Take only HC_M and do not take the rows where there are NA's in the row, and take SD_HC_M and do not take the rows where there are NA's in the row.
-
-long <-
-  tidyr::pivot_longer(df1, c(PITCH_F0_HC_M, PITCH_F0_SZ_M), values_to = 'Pitch_M') %>% 
-  mutate(Pitch_SD = tidyr::pivot_longer(df1, c(PITCH_F0SD_HC_M, PITCH_F0SD_SZ_M))[['value']],
-         Diagnosis = ifelse(name == 'PITCH_F0_HC_M', 'HC', 'SZ')) %>% 
-  select(-c('name'))
-
-# Models
-meanmodel <- lmer(Pitch_M ~ Diagnosis + (1|StudyID), data = long)
-summary(meanmodel)
-
-sdmodel <- lmer(Pitch_SD ~ Diagnosis + (1|StudyID), data = long)
-summary(sdmodel)
+```{r}
+# Removing NA's from HC_M and SD_HC_M (but I actually do not use it)
+df1 <- df %>% filter(PITCH_F0_HC_M != is.na(PITCH_F0_HC_M) | PITCH_F0SD_HC_M != is.na(PITCH_F0SD_HC_M)) %>%   select(c('StudyID', 
+           'PITCH_F0_HC_M',
+           'PITCH_F0_SZ_M',
+           'PITCH_F0SD_HC_M',
+           'PITCH_F0SD_SZ_M'
+           )
+         )
+View(df1) 
 
 ```
 
 # Creating effect size (yi) and sampling variance (vi) columns
-This function "escalc" creates two new columns, where yi is the observed effect size and vi is the variance which we can use in our models. 
+This function "escalc" creates two new columns, where yi is the observed effect size and vi is the variance which we can use in our models. SMD = standardized  mean difference, which is Cohen's d - a measure of effect size. We want it standardized because that allows us to compare across studies, and this is what we do in meta analyses. 
 
 ```{r}
-# Creating effect size and sampling variance columns
-WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0SD_HC_M, sd2i = PITCH_F0SD_SZ_M, data = df1) #SMD = standardized mean difference.
+# Creating effect size and sampling variance columns using escalc
+WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0SD_HC_M, sd2i = PITCH_F0SD_SZ_M, data = df)
 
-View(WM_d)
+# We can only get effect size estimates from 2 studies - study 1 and 50, because they are the only rows where there are both the means and the sd values: (complete)
+test <- WM_d %>% select(StudyID,yi,vi,PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0SD_HC_M,PITCH_F0SD_SZ_M)
 
-variable.names(WM_d)
+# Trying other SD columns now, it works! 6 effect sizes now :) wooow :) SO MANY. Delete the two codelines above when youre ready to not see the mistakes of yore
+WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0_HC_SD, sd2i = PITCH_F0_SZ_SD, data = df)
+
+# Wee see now
+test <- WM_d %>% select(StudyID,yi,vi,PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0SD_HC_M,PITCH_F0SD_SZ_M)
+
 ```
 
-# Making models (took syntax from slides and changed names to fit) 
-When we do meta analysis, we can predict the standardized mean difference, which is the effect size (corresponds to Cohen's d - they are the same). Put weights 1/vi, meaning 1/ sampling variance.
-
+# MODEL THAT SHIT
+MODELS FROM SLIDES
 ```{r}
 # Mixed effects implementation
-m <- lmer(yi ~ 1 + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore")) #Hessian is numerically singular: parameters are not uniquely determinedModel may not have converged with 1 eigenvalue close to zero: 7.2e-10
+m <- lmer(yi ~ 1 + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore")) #Model may not have converged with 1 eigenvalue close to zero: 7.2e-10
+
+summary(m)
 
 #Meta-analysis optimization:
+# The rma tells R that you want to do a random effects meta-analysis 
 m2 <-rma(yi, vi, data = WM_d, slab = StudyID) # Slab = random effect
+
+funnel(m2)
+forest(m2)
 
 # What if we have a fixed effect?
 m3 <- lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
 
+summary(m3)
+
 #m4 <- rma(yi, vi, mods = cbind(Language), data = data, slab=study)
 
-# WTF IS MISSING jeuss. it only makes effect size for study 1 and 5 why?
-
-
 ```
+
+
+
+
+
 
 
 ```{r}
-forest(m2)
-funnel(m2)
+# # Making it long so we can use it for modelling - do we need to?
+# long <-
+#   tidyr::pivot_longer(df1, c(PITCH_F0_HC_M, PITCH_F0_SZ_M), values_to = 'Pitch_M') %>%
+#   mutate(
+#     Pitch_SD = tidyr::pivot_longer(df1, c(PITCH_F0SD_HC_M, PITCH_F0SD_SZ_M))[['value']],
+#     Diagnosis = ifelse(name == 'PITCH_F0_HC_M', 'HC', 'SZ')
+#   ) %>%
+#   select(-c('name'))
+
+
+
+
+# MODELS FROM CLASS
+# # Models
+# meanmodel <- lmer(Pitch_M ~ Diagnosis + (1|StudyID), data = long)
+# summary(meanmodel)
+# 
+# sdmodel <- lmer(Pitch_SD ~ Diagnosis + (1|StudyID), data = long)
+# summary(sdmodel)
+
+
+
+# 
+# # MODELS FROM BYRA SLIDES
+# # Mixed effects implementation
+# m <- lmer(yi ~ 1 + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore")) #Hessian is numerically singular: parameters are not uniquely determinedModel may not have converged with 1 eigenvalue close to zero: 7.2e-10
+# 
+# #Meta-analysis optimization:
+# # The rma tells R that you want to do a random effects meta-analysis 
+# m2 <-rma(yi, vi, data = WM_d, slab = StudyID) # Slab = random effect
+# 
+# # What if we have a fixed effect?
+# m3 <- lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
+# 
+# #m4 <- rma(yi, vi, mods = cbind(Language), data = data, slab=study)
+# 
+# funnel(m2)
+# forest(m2)
+# 
+
+
 ```
 
-- Following the procedure in the slides calculate effect size and standard error of the effect size per each study. N.B. we focus on pitch mean (PITCH_F0_HC_M),(PITCH_F0_SZ_M) and pitch standard deviation (PITCH_F0SD_HC_M),(PITCH_F0SD_SZ_M).
- . first try using lmer (to connect to what you know of mixed effects models)
- . then use rma() (to get some juicy additional statistics)
- 
-```{r}
 
-```
 
-- Build a forest plot of the results (forest(model))
- 
-- Go back to Assignment 3, add your own study to the data table, and re-run meta-analysis. Do the results change?
 
-- Now look at the output of rma() and check tau and I2
+
+
