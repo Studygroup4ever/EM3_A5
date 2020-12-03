@@ -62,13 +62,21 @@ df %>% summarise(
   PitchF0SDSZ = length(na.omit(PITCH_F0SD_SZ_M))
   )
 
-df1 <- df %>% filter(PITCH_F0_HC_M != is.na(PITCH_F0_HC_M) | PITCH_F0SD_HC_M != is.na(PITCH_F0SD_HC_M))
+df1 <- df %>% 
+  filter(PITCH_F0_HC_M != is.na(PITCH_F0_HC_M) | PITCH_F0SD_HC_M != is.na(PITCH_F0SD_HC_M)) %>% 
+  select(c('StudyID', 
+           'PITCH_F0_HC_M',
+           'PITCH_F0_SZ_M',
+           'PITCH_F0SD_HC_M',
+           'PITCH_F0SD_SZ_M'
+           )
+         )
 
-long <- tidyr::pivot_longer(df1, c(PITCH_F0_HC_M, PITCH_F0_SZ_M), values_to = 'Pitch_M') %>% 
-  select(
-    -c()
-  )
-
+long <-
+  tidyr::pivot_longer(df1, c(PITCH_F0_HC_M, PITCH_F0_SZ_M), values_to = 'Pitch_M') %>% 
+  mutate(Pitch_SD = tidyr::pivot_longer(df1, c(PITCH_F0SD_HC_M, PITCH_F0SD_SZ_M))[['value']],
+         Diagnosis = ifelse(name == 'PITCH_F0_HC_M', 'HC', 'SZ')) %>% 
+  select(-c('name'))
 
 
 ```
