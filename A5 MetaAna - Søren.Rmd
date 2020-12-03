@@ -13,7 +13,9 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Questions to be answered
 
-1. What is the current evidence for distinctive vocal patterns in schizophrenia? Report how many papers report quantitative estimates, comment on what percentage of the overall studies reviewed they represent (see PRISMA chart) your method to analyze them, the estimated effect size of the difference (mean effect size and standard error) and forest plots representing it. N.B. Only measures of pitch mean and pitch sd are required for the assignment (all the other measures have been removed from the dataset for the sake of simplicity). 
+1. What is the current evidence for distinctive vocal patterns in schizophrenia? Report how many papers report quantitative estimates, 
+
+comment on what percentage of the overall studies reviewed they represent (see PRISMA chart) your method to analyze them, the estimated effect size of the difference (mean effect size and standard error) and forest plots representing it. N.B. Only measures of pitch mean and pitch sd are required for the assignment (all the other measures have been removed from the dataset for the sake of simplicity). 
 
 2. Do the results match your own analysis from Assignment 3? If you add your results to the meta-analysis, do the estimated effect sizes change? Report the new estimates and the new forest plots.
 
@@ -35,3 +37,51 @@ Prisma chart: https://www.dropbox.com/s/vbjf6ff73dv9tru/PRISMA%202009%20flow%20d
 - Go back to Assignment 3, add your own study to the data table, and re-run meta-analysis. Do the results change?
 
 - Now look at the output of rma() and check tau and I2
+
+```{r}
+pacman::p_load(readxl, tidyverse)
+```
+
+
+
+```{r}
+df <- read_xlsx('Matrix_MetaAnalysis_Diagnosis_updated290719.xlsx') 
+
+```
+
+```{r}
+df_sub <- df %>% select(StudyID,
+                        PITCH_F0_HC_M,
+                        PITCH_F0_SZ_M,
+                        PITCH_F0SD_HC_M,
+                        PITCH_F0SD_SZ_M)
+df %>% summarise(
+  PitchF0HC = length(na.omit(PITCH_F0_HC_M)),
+  PitchF0SZ = length(na.omit(PITCH_F0_SZ_M)),
+  PitchF0SDHC = length(na.omit(PITCH_F0SD_HC_M)),
+  PitchF0SDSZ = length(na.omit(PITCH_F0SD_SZ_M))
+  )
+
+df1 <- df %>% filter(PITCH_F0_HC_M != is.na(PITCH_F0_HC_M) | PITCH_F0SD_HC_M != is.na(PITCH_F0SD_HC_M))
+
+long <- tidyr::pivot_longer(df1, c(PITCH_F0_HC_M, PITCH_F0_SZ_M), values_to = 'Pitch_M') %>% 
+  select(
+    -c()
+  )
+
+
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
