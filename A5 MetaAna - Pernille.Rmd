@@ -10,7 +10,6 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 # Building on the shoulders of giants: meta-analysis
-
 ## Questions to be answered
 
 1. What is the current evidence for distinctive vocal patterns in schizophrenia? Report how many papers report quantitative estimates, comment on what percentage of the overall studies reviewed they represent (see PRISMA chart) your method to analyze them, the estimated effect size of the difference (mean effect size and standard error) and forest plots representing it. 
@@ -80,7 +79,6 @@ WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i 
 View(WM_d)
 
 variable.names(WM_d)
-
 ```
 
 # Making models (took syntax from slides and changed names to fit) 
@@ -91,12 +89,15 @@ When we do meta analysis, we can predict the standardized mean difference, which
 m <- lmer(yi ~ 1 + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore")) #Hessian is numerically singular: parameters are not uniquely determinedModel may not have converged with 1 eigenvalue close to zero: 7.2e-10
 
 #Meta-analysis optimization:
-m2 <-rma (yi, vi, data = WM_d, slab = StudyID) # Slab = random effect
+m2 <-rma(yi, vi, data = WM_d, slab = StudyID) # Slab = random effect
 
 # What if we have a fixed effect?
 m3 <- lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
 
 #m4 <- rma(yi, vi, mods = cbind(Language), data = data, slab=study)
+
+# WTF IS MISSING jeuss. it only makes effect size for study 1 and 5 why?
+
 
 ```
 
