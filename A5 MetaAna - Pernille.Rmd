@@ -13,18 +13,16 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Questions to be answered
 
-1. What is the current evidence for distinctive vocal patterns in schizophrenia? Report how many papers report quantitative estimates, comment on what percentage of the overall studies reviewed they represent (see PRISMA chart) your method to analyze them, the estimated effect size of the difference (mean effect size and standard error) and forest plots representing it. N.B. Only measures of pitch mean and pitch sd are required for the assignment (all the other measures have been removed from the data-set for the sake of simplicity). 
+1. What is the current evidence for distinctive vocal patterns in schizophrenia? Report how many papers report quantitative estimates, comment on what percentage of the overall studies reviewed they represent (see PRISMA chart) your method to analyze them, the estimated effect size of the difference (mean effect size and standard error) and forest plots representing it. 
+
+N.B. Only measures of pitch mean and pitch sd are required for the assignment (all the other measures have been removed from the data-set for the sake of simplicity). 
 
 ```{r}
-pacman::p_load(readxl,tidyverse)
+pacman::p_load(readxl,tidyverse,tidyr, lmerTest, lme4,metafor)
 
 df <- read_xlsx("Matrix_MetaAnalysis_Diagnosis_updated290719.xlsx")
 
 View(df)
-
-# Report how many papers report quantitative estimates
-
-
 ```
 
 2. Do the results match your own analysis from Assignment 3? If you add your results to the meta-analysis, do the estimated effect sizes change? Report the new estimates and the new forest plots.
@@ -39,23 +37,82 @@ Prisma chart: https://www.dropbox.com/s/vbjf6ff73dv9tru/PRISMA%202009%20flow%20d
 - Look through the dataset to find out which columns to use, and if there is any additional information written as comments (real world data is always messy!).
     * Hint: PITCH_F0M and PITCH_F0SD group of variables are what you need
 ```{r}
-variable.names(df_sub)
-df_sub <- df %>% 
-  select(ArticleID,StudyID,Authors,DIAGNOSIS,PITCH_F0_HC_M, PITCH_F0_HC_SD, PITCH_F0_SZ_M, PITCH_F0_SZ_SD, pitch_f0_variability)
 
-View(df_sub)
+# Sørens
+df_sub <- df %>% select(StudyID,
+                        PITCH_F0_HC_M,
+                        PITCH_F0_SZ_M,
+                        PITCH_F0SD_HC_M,
+                        PITCH_F0SD_SZ_M, 
+                        SAMPLE_SIZE_HC, SAMPLE_SIZE_SZ, PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0SD_HC_M
+                        )
+df %>% summarise(
+  PitchF0HC = length(na.omit(PITCH_F0_HC_M)),
+  PitchF0SZ = length(na.omit(PITCH_F0_SZ_M)),
+  PitchF0SDHC = length(na.omit(PITCH_F0SD_HC_M)),
+  PitchF0SDSZ = length(na.omit(PITCH_F0SD_SZ_M))
+  )
 
-studiesincluded <- df_sub[complete.cases(df_sub[ , 2:6]),]
+df1 <- df %>% filter(PITCH_F0_HC_M != is.na(PITCH_F0_HC_M) | PITCH_F0SD_HC_M != is.na(PITCH_F0SD_HC_M)) # Take only HC_M and do not take the rows where there are NA's in the row, and take SD_HC_M and do not take the rows where there are NA's in the row.
+
+long <-
+  tidyr::pivot_longer(df1, c(PITCH_F0_HC_M, PITCH_F0_SZ_M), values_to = 'Pitch_M') %>% 
+  mutate(Pitch_SD = tidyr::pivot_longer(df1, c(PITCH_F0SD_HC_M, PITCH_F0SD_SZ_M))[['value']],
+         Diagnosis = ifelse(name == 'PITCH_F0_HC_M', 'HC', 'SZ')) %>% 
+  select(-c('name'))
+
+# Models
+meanmodel <- lmer(Pitch_M ~ Diagnosis + (1|StudyID), data = long)
+summary(meanmodel)
+
+sdmodel <- lmer(Pitch_SD ~ Diagnosis + (1|StudyID), data = long)
+summary(sdmodel)
+
+```
+
+# Creating effect size (yi) and sampling variance (vi) columns
+This function "escalc" creates two new columns, where yi is the observed effect size and vi is the variance which we can use in our models. 
+
+```{r}
+# Creating effect size and sampling variance columns
+WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0SD_HC_M, sd2i = PITCH_F0SD_SZ_M, data = df1) #SMD = standardized mean difference.
+
+View(WM_d)
+
+variable.names(WM_d)
+
+```
+
+# Making models (took syntax from slides and changed names to fit) 
+When we do meta analysis, we can predict the standardized mean difference, which is the effect size (corresponds to Cohen's d - they are the same). Put weights 1/vi, meaning 1/ sampling variance.
+
+```{r}
+# Mixed effects implementation
+m <- lmer(yi ~ 1 + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore")) #Hessian is numerically singular: parameters are not uniquely determinedModel may not have converged with 1 eigenvalue close to zero: 7.2e-10
+
+#Meta-analysis optimization:
+m2 <-rma (yi, vi, data = WM_d, slab = StudyID) # Slab = random effect
+
+# What if we have a fixed effect?
+m3 <- lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
+
+#m4 <- rma(yi, vi, mods = cbind(Language), data = data, slab=study)
 
 ```
 
 
 ```{r}
+forest(m2)
+funnel(m2)
 ```
-  
-- Following the procedure in the slides calculate effect size and standard error of the effect size per each study. N.B. we focus on pitch mean and pitch standard deviation.
+
+- Following the procedure in the slides calculate effect size and standard error of the effect size per each study. N.B. we focus on pitch mean (PITCH_F0_HC_M),(PITCH_F0_SZ_M) and pitch standard deviation (PITCH_F0SD_HC_M),(PITCH_F0SD_SZ_M).
  . first try using lmer (to connect to what you know of mixed effects models)
  . then use rma() (to get some juicy additional statistics)
+ 
+```{r}
+
+```
 
 - Build a forest plot of the results (forest(model))
  
