@@ -224,3 +224,23 @@ m32 <-
 summary(m32)
 
 ```
+#FINDING INFLUENTIAL STUDIES
+```{r}
+# Influential points on the meta analysis without our studies
+inf1<- influence(m2)
+inf1$ids <- rownames(print(inf1))
+plot(inf1)
+
+# Influential points on the meta analysis with our studies
+inf2<- influence(m22)
+inf2$ids <- rownames(print(inf2))
+plot(inf2)
+
+```
+
+
+
+
+
+
+
