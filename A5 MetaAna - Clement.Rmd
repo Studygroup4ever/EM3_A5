@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ```{r}
 #Packages
-pacman::p_load(lme4, tidyverse, readxl, forestplot, metafor)
+pacman::p_load(lme4, tidyverse, readxl, forestplot, metafor, data.table)
 ```
 
 ```{r}
@@ -128,7 +128,12 @@ Prisma chart: https://www.dropbox.com/s/vbjf6ff73dv9tru/PRISMA%202009%20flow%20d
  
 - Go back to Assignment 3, add your own study to the data table, and re-run meta-analysis. Do the results change?
 ```{r}
-pitch_data <- read_csv("C:/Users/cleme/Desktop/3. Semester CogSci/Exp Meth 3/Portfolios/Portfolio 2/A3-P2/pitch_data.csv")
+pitch_data <- read_csv("C:/Users/cleme/Desktop/3. Semester CogSci/Exp Meth 3/Portfolios/Portfolio 2/A3-P2/pitch_data.csv")%>% 
+  filter(study == 1:4) %>% 
+  mutate(diagnosis = as.factor(diagnosis),
+         study = as.factor(study),
+         subject = as.factor(subject))
+
 
 danish_data <- pitch_data %>% 
   filter(study == 1 | study == 2 | study == 3 | study == 4)
@@ -147,8 +152,12 @@ small_meta <- danish_data %>%
   group_by(study, diagnosis) %>% 
   summarise(PITCH_F0_M = mean(mean),
             PITCH_F0SD = sd(mean))
-            
-small_meta2 <- c(, , "PITCH_F0SD_HC", "PITCH_F0SD_SZ", "SAMPLE_SIZE_HC", "SAMPLE_SIZE_SZ"))
+
+
+danish_data %>%
+  group_by(study, diagnosis) %>%
+  summarise(count = n_distinct(subject))
+
 
 
 small_meta <- small_meta %>%
@@ -156,6 +165,8 @@ small_meta <- small_meta %>%
 
 danish_data %>% 
   unique(subject)
+
+?influence
 ```
 
 
