@@ -168,12 +168,12 @@ new_df <- rbind(df, new)
 WM_d2 <-
   escalc(
     measure = "SMD",
-    n1i = SAMPLE_SIZE_HC,
-    n2i = SAMPLE_SIZE_SZ,
-    m1i = PITCH_F0_HC_M,
-    m2i = PITCH_F0_SZ_M,
-    sd1i = PITCH_F0_HC_SD,
-    sd2i = PITCH_F0_SZ_SD,
+    n1i = as.numeric(SAMPLE_SIZE_HC),
+    n2i = as.numeric(SAMPLE_SIZE_SZ),
+    m1i = as.numeric(PITCH_F0_HC_M),
+    m2i = as.numeric(PITCH_F0_SZ_M),
+    sd1i = as.numeric(PITCH_F0_HC_SD),
+    sd2i = as.numeric(PITCH_F0_SZ_SD),
     data = new_df
   )
 
