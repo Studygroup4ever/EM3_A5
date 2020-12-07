@@ -37,6 +37,7 @@ Prisma chart: https://www.dropbox.com/s/vbjf6ff73dv9tru/PRISMA%202009%20flow%20d
 
 - Now look at the output of rma() and check tau and I2
 
+# SETUP and LOAD-IN
 ```{r}
 # Setup
 pacman::p_load(readxl,tidyverse,tidyr, lmerTest, lme4,metafor)
@@ -54,64 +55,36 @@ df %>% summarise(
 ```
 So, we have 6 complete case-studies for Pitch-mean in healthy controls, 10 complete ones in Pitch-mean in schizophrenics, 15 complete ones in Pitch-standard-deviation-mean in healthy controls (there will be overlap with the 6) and then 20 complete ones in Pitch-standard-deviation mean in schizophrenics (again, there will be overlap here with the 10).
 
-```{r}
-# Removing NA's from HC_M and SD_HC_M (but I actually do not use it)
-# df1 <- df %>% filter(PITCH_F0_HC_M != is.na(PITCH_F0_HC_M) | PITCH_F0SD_HC_M != is.na(PITCH_F0SD_HC_M)) %>%   select(c('StudyID', 
-#            'PITCH_F0_HC_M',
-#            'PITCH_F0_SZ_M',
-#            'PITCH_F0SD_HC_M',
-#            'PITCH_F0SD_SZ_M'
-#            )
-#          )
-# View(df1) 
-
-```
-
-# Creating effect size (yi) and sampling variance (vi) columns
+# GETTING STANDARDIZED MEAN DIFFERENCE (EFFECT SIZES) 
 This function "escalc" creates two new columns, where yi is the observed effect size and vi is the variance which we can use in our models. SMD = standardized  mean difference, which is Cohen's d - a measure of effect size. We want it standardized because that allows us to compare across studies, and this is what we do in meta analyses. 
+
 
 ```{r}
 # Creating effect size and sampling variance columns using escalc
-#WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0SD_HC_M, sd2i = PITCH_F0SD_SZ_M, data = df)
-
-# We can only get effect size estimates from 2 studies - study 1 and 50, because they are the only rows where there are both the means and the sd values: (complete)
-#test <- WM_d %>% select(StudyID,yi,vi,PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0SD_HC_M,PITCH_F0SD_SZ_M)
-
-# Trying other SD columns now, it works! 6 effect sizes now :) wooow :) SO MANY. Delete the two codelines above when youre ready to not see the mistakes of yore
 WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0_HC_SD, sd2i = PITCH_F0_SZ_SD, data = df)
 
-# Vi skal bruge de her: 
-# PITCH_F0_HC_M
-# PITCH_F0_SZ_M
-# PITCH_F0_HC_SD
-# PITCH_F0_SZ_SD
-# SAMPLE SIZE HC
-# SAMPLE SIZE SZ
-
-# Wee see now
-test <- WM_d %>% select(StudyID,yi,vi,PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0SD_HC_M,PITCH_F0SD_SZ_M)
+# It can be seen here
+test <- WM_d %>% select(StudyID,yi,vi,PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0_HC_SD,PITCH_F0_SZ_SD)
 
 ```
 
-# MODELLING
-MODELS FROM SLIDES
+# MODELLING BEFORE ADDING STUDIES FROM ASSIGNMENT 3
 ```{r}
-
-# Mixed effects implementation
+# Making a mixed effects implementation
 m <- lmer(yi ~ 1 + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore")) #Model may not have converged with 1 eigenvalue close to zero: 7.2e-10
 
 summary(m)
 
-#Meta-analysis optimization:
-# The rma tells R that you want to do a random effects meta-analysis 
-m2 <-rma(yi, vi, data = WM_d, slab = Article) # Slab = random effect
+# A Meta-analysis optimization:
+m2 <-rma(yi, vi, data = WM_d, slab = Article) # Slab = random effect. Put here as Article to get the authors names instead of just numbers.
 
 summary(m2)
 
-funnel(m2)
+# Making a forest and funnel plot
 forest(m2)
+funnel(m2)
 
-regtest(m2)
+# Checking publication bias with ranktest
 ranktest(m2)
 
 # What if we have a fixed effect?
@@ -119,56 +92,51 @@ m3 <- lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID), weights = 1/vi, data=WM_d, con
 
 summary(m3)
 
-#m4 <- rma(yi, vi, mods = cbind(Language), data = data, slab=study)
+```
+
+# ADDING STUDIES FROM ASSIGNMENT 3: 
+```{r}
+
+# CODE
+# ADD TO DF OR MAKE NEW (define new either way)
+
+```
+
+# GETTING STANDARDIZED MEAN DIFFERENCE (EFFECT SIZES) W. MORE STUDIES
+```{r}
+# Creating effect size and sampling variance columns using escalc
+WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0_HC_SD, sd2i = PITCH_F0_SZ_SD, data = df)
+
+# The new effect sizes can be seen here
+test <- WM_d %>% select(StudyID,yi,vi,PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0_HC_SD,PITCH_F0_SZ_SD)
 
 ```
 
 
-
-
-
-
-
+# MODELLING AFTER ADDING STUDIES FROM ASSIGNMENT 3
 ```{r}
-# # Making it long so we can use it for modelling - do we need to?
-# long <-
-#   tidyr::pivot_longer(df1, c(PITCH_F0_HC_M, PITCH_F0_SZ_M), values_to = 'Pitch_M') %>%
-#   mutate(
-#     Pitch_SD = tidyr::pivot_longer(df1, c(PITCH_F0SD_HC_M, PITCH_F0SD_SZ_M))[['value']],
-#     Diagnosis = ifelse(name == 'PITCH_F0_HC_M', 'HC', 'SZ')
-#   ) %>%
-#   select(-c('name'))
 
+# Making a mixed effects implementation
+m <- lmer(yi ~ 1 + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore")) #Model may not have converged with 1 eigenvalue close to zero: 7.2e-10
 
+summary(m)
 
+# A Meta-analysis optimization:
+m2 <-rma(yi, vi, data = WM_d, slab = Article) # Slab = random effect. Put here as Article to get the authors names instead of just numbers.
 
-# MODELS FROM CLASS
-# # Models
-# meanmodel <- lmer(Pitch_M ~ Diagnosis + (1|StudyID), data = long)
-# summary(meanmodel)
-# 
-# sdmodel <- lmer(Pitch_SD ~ Diagnosis + (1|StudyID), data = long)
-# summary(sdmodel)
+summary(m2)
 
+# Making a forest and funnel plot
+forest(m2)
+funnel(m2)
 
+# Checking publication bias with ranktest
+ranktest(m2)
 
-# 
-# # MODELS FROM BYRA SLIDES
-# # Mixed effects implementation
-# m <- lmer(yi ~ 1 + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore")) #Hessian is numerically singular: parameters are not uniquely determinedModel may not have converged with 1 eigenvalue close to zero: 7.2e-10
-# 
-# #Meta-analysis optimization:
-# # The rma tells R that you want to do a random effects meta-analysis 
-# m2 <-rma(yi, vi, data = WM_d, slab = StudyID) # Slab = random effect
-# 
-# # What if we have a fixed effect?
-# m3 <- lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
-# 
-# #m4 <- rma(yi, vi, mods = cbind(Language), data = data, slab=study)
-# 
-# funnel(m2)
-# forest(m2)
-# 
+# What if we have a fixed effect?
+m3 <- lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
+
+summary(m3)
 
 
 ```
