@@ -2,7 +2,9 @@
 title: "Assignment 5 - Meta-analysis of pitch in schizophrenia"
 author: "Riccardo Fusaroli"
 date: "3/7/2019"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -192,14 +194,14 @@ test2 <-
 # MODELLING AFTER ADDING STUDIES FROM ASSIGNMENT 3
 ```{r}
 # Making a mixed effects implementation
-m2 <-
+m22 <-
   lmer( yi ~ 1 + (1 | StudyID),
         weights = 1 / vi,
         data = WM_d2,
         control = lmerControl(check.nobs.vs.nlev = "ignore", check.nobs.vs.nRE = "ignore")
         ) #Model may not have converged with 1 eigenvalue close to zero: 7.2e-10
 
-summary(m2)
+summary(m22)
 
 # A Meta-analysis optimization:
 m22 <- rma(yi, vi, data = WM_d2, slab = Article) 
