@@ -131,7 +131,7 @@ olddf <- read_csv('pitch_data.csv') %>% filter(Study == 1:4) %>% mutate(Diagnosi
                                                Subject = as.factor(Subject))
 
 # Finding the information we need
-olddf %>% group_by(Study, Diagnosis) %>% 
+obj <- olddf %>% group_by(Study, Diagnosis) %>% 
   summarise(meanF0 = mean(Mean),
             SDF0 = sd(Mean),
             SampleSize = n_distinct(Subject)
