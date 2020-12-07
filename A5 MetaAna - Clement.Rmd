@@ -1,0 +1,163 @@
+---
+title: "Assignment 5 - Meta-analysis of pitch in schizophrenia"
+author: "Riccardo Fusaroli"
+date: "3/7/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+#Packages
+pacman::p_load(lme4, tidyverse, readxl, forestplot, metafor)
+```
+
+```{r}
+#Loading the data
+df <- read_excel("C:/Users/cleme/Desktop/3. Semester CogSci/Exp Meth 3/Portfolios/Matrix_MetaAnalysis_Diagnosis_updated290719.xlsx")
+
+df1 <- select(df, "ArticleID", "StudyID", "Title", "Year_publication", "DIAGNOSIS", "MALE_SZ", "FEMALE_SZ", "MALE_HC", "FEMALE_HC", "SAMPLE_SIZE_SZ", "SAMPLE_SIZE_HC", "PITCH_F0_HC_M", "PITCH_F0_HC_SD", "PITCH_F0_SZ_M", "PITCH_F0_SZ_SD", 104:107)
+
+```
+
+# Building on the shoulders of giants: meta-analysis
+
+## Questions to be answered
+
+1. What is the current evidence for distinctive vocal patterns in schizophrenia? Report how many papers report quantitative estimates, comment on what percentage of the overall studies reviewed they represent (see PRISMA chart) your method to analyze them, the estimated effect size of the difference (mean effect size and standard error) and forest plots representing it. N.B. Only measures of pitch mean and pitch sd are required for the assignment (all the other measures have been removed from the dataset for the sake of simplicity). 
+
+```{r}
+#How many studies show quantitative estimates?
+
+# studiesincluded <- df1[complete.cases(df1[ , 12:15]),]
+# 
+# studiesincluded2 <- df[complete.cases(df[ , 104:107]),]
+# 
+# sub_studiesincluded2 <- select(studiesincluded2, "ArticleID", "StudyID", "Title", "Year_publication", "DIAGNOSIS", "MALE_SZ", "FEMALE_SZ", "MALE_HC", "FEMALE_HC", "SAMPLE_SIZE_SZ", "SAMPLE_SIZE_HC", "PITCH_F0_HC_M", "PITCH_F0_HC_SD", "PITCH_F0_SZ_M", "PITCH_F0_SZ_SD", 104:107)
+# 
+# studies <- rbind(studiesincluded, sub_studiesincluded2)
+# 
+
+df1 <- df %>% filter(PITCH_F0_HC_M != is.na(PITCH_F0_HC_M) | PITCH_F0SD_HC_M != is.na(PITCH_F0SD_HC_M)) %>%   select(c('StudyID', 
+           'PITCH_F0_HC_M',
+           'PITCH_F0_SZ_M',
+           'PITCH_F0SD_HC_M',
+           'PITCH_F0SD_SZ_M'
+           ))
+
+df2 <- select(df1, "ArticleID", "StudyID", "Title", "Year_publication", "DIAGNOSIS", "MALE_SZ", "FEMALE_SZ", "MALE_HC", "FEMALE_HC", "SAMPLE_SIZE_SZ", "SAMPLE_SIZE_HC", "PITCH_F0_HC_M", "PITCH_F0_HC_SD", "PITCH_F0_SZ_M", "PITCH_F0_SZ_SD", 104:107)
+
+df %>% summarise(
+  PitchF0HC = length(na.omit(PITCH_F0_HC_M)),
+  PitchF0SZ = length(na.omit(PITCH_F0_SZ_M)),
+  PitchF0SDHC = length(na.omit(PITCH_F0SD_HC_M)),
+  PitchF0SDSZ = length(na.omit(PITCH_F0SD_SZ_M))
+  )
+
+long <-
+  tidyr::pivot_longer(df2, c(PITCH_F0_HC_M, PITCH_F0_SZ_M), values_to = 'Pitch_M') %>% 
+  mutate(Pitch_SD = tidyr::pivot_longer(df1, c(PITCH_F0SD_HC_M, PITCH_F0SD_SZ_M))[['value']],
+         Diagnosis = ifelse(name == 'PITCH_F0_HC_M', 'HC', 'SZ')) %>% 
+  select(-c('name'))
+
+model_mean <- rma(Pitch_M ~ Diagnosis + (1|StudyID), data = long)
+model_SD <- rma(Pitch_SD ~ Diagnosis + (1|StudyID), data = long)
+
+summary(model_mean);summary(model_SD)
+
+
+# Creating effect size and sampling variance columns using escalc
+WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0SD_HC_M, sd2i = PITCH_F0SD_SZ_M, data = df) #Standardized mean difference "SMD"
+
+?escalc
+
+# We can only get effect size estimates from 2 studies - study 1 and 50, because they are the only rows where there are both the means and the sd values: (complete)
+test <- WM_d %>% select(StudyID,yi,vi,PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0SD_HC_M,PITCH_F0SD_SZ_M)
+test
+# Trying other SD columns now, it works! 6 effect sizes now :) wooow :) SO MANY. Delete the two codelines above when you're ready to not see the mistakes of yore
+WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0_HC_SD, sd2i = PITCH_F0_SZ_SD, data = df)
+
+# Wee see now
+test <- WM_d %>% select(StudyID,yi,vi,PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0SD_HC_M,PITCH_F0SD_SZ_M)
+
+```
+
+# MODEL THAT SHIT
+MODELS FROM SLIDES
+```{r}
+# Mixed effects implementation
+m <- lmer(yi ~ 1 + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore")) #Model may not have converged with 1 eigenvalue close to zero: 7.2e-10
+
+summary(m)
+
+#Meta-analysis optimization:
+# The rma tells R that you want to do a random effects meta-analysis 
+m2 <-rma(yi, vi, data = WM_d, slab = Article) # Slab = random effect
+
+funnel(m2)
+forest(m2)
+
+# What if we have a fixed effect?
+m3 <- lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
+
+summary(m3)
+
+#m4 <- rma(yi, vi, mods = cbind(Language), data = data, slab=study)
+
+```
+
+
+2. Do the results match your own analysis from Assignment 3? If you add your results to the meta-analysis, do the estimated effect sizes change? Report the new estimates and the new forest plots.
+
+3. Assess the quality of the literature: report and comment on heterogeneity of the studies (tau, I2), on publication bias (funnel plot), and on influential studies.
+
+## Tips on the process to follow:
+
+- Download the data on all published articles analyzing voice in schizophrenia and the prisma chart as reference of all articles found and reviewed
+Data: https://www.dropbox.com/s/0l9ur0gaabr80a8/Matrix_MetaAnalysis_Diagnosis_updated290719.xlsx?dl=0
+Prisma chart: https://www.dropbox.com/s/vbjf6ff73dv9tru/PRISMA%202009%20flow%20diagram_PP.pptx?dl=0 
+- Look through the dataset to find out which columns to use, and if there is any additional information written as comments (real world data is always messy!).
+    * Hint: PITCH_F0M and PITCH_F0SD group of variables are what you need
+- Following the procedure in the slides calculate effect size and standard error of the effect size per each study. N.B. we focus on pitch mean and pitch standard deviation.
+ . first try using lmer (to connect to what you know of mixed effects models)
+ . then use rma() (to get some juicy additional statistics)
+
+- Build a forest plot of the results (forest(model))
+ 
+- Go back to Assignment 3, add your own study to the data table, and re-run meta-analysis. Do the results change?
+```{r}
+pitch_data <- read_csv("C:/Users/cleme/Desktop/3. Semester CogSci/Exp Meth 3/Portfolios/Portfolio 2/A3-P2/pitch_data.csv")
+
+danish_data <- pitch_data %>% 
+  filter(study == 1 | study == 2 | study == 3 | study == 4)
+
+
+SAMPLE_SIZE_HC
+SAMPLE_SIZE_SZ
+PITCH_F0_HC_M
+PITCH_F0_SZ_M
+PITCH_F0_HC_SD
+PITCH_F0_SZ_SD
+danish_data$diagnosis <- as.factor(danish_data$diagnosis)
+danish_data$study <- as.factor(danish_data$study)
+
+small_meta <- danish_data %>% 
+  group_by(study, diagnosis) %>% 
+  summarise(PITCH_F0_M = mean(mean),
+            PITCH_F0SD = sd(mean))
+            
+small_meta2 <- c(, , "PITCH_F0SD_HC", "PITCH_F0SD_SZ", "SAMPLE_SIZE_HC", "SAMPLE_SIZE_SZ"))
+
+
+small_meta <- small_meta %>%
+  mutate(PITCH_F0_HC_M = PITCH_F0_M | diagnosis == 0)
+
+danish_data %>% 
+  unique(subject)
+```
+
+
+
+- Now look at the output of rma() and check tau and I2
