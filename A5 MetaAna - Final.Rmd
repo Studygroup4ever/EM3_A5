@@ -51,44 +51,70 @@ df %>% summarise(
   PitchF0SZ = length(na.omit(PITCH_F0_SZ_M)),
   PitchF0SDHC = length(na.omit(PITCH_F0SD_HC_M)),
   PitchF0SDSZ = length(na.omit(PITCH_F0SD_SZ_M))
-  )
+)
 ```
 So, we have 6 complete case-studies for Pitch-mean in healthy controls, 10 complete ones in Pitch-mean in schizophrenics, 15 complete ones in Pitch-standard-deviation-mean in healthy controls (there will be overlap with the 6) and then 20 complete ones in Pitch-standard-deviation mean in schizophrenics (again, there will be overlap here with the 10).
 
 # GETTING STANDARDIZED MEAN DIFFERENCE (EFFECT SIZES) 
 This function "escalc" creates two new columns, where yi is the observed effect size and vi is the variance which we can use in our models. SMD = standardized  mean difference, which is Cohen's d - a measure of effect size. We want it standardized because that allows us to compare across studies, and this is what we do in meta analyses. 
 
-
 ```{r}
 # Creating effect size and sampling variance columns using escalc
-WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0_HC_SD, sd2i = PITCH_F0_SZ_SD, data = df)
+WM_d <-
+  escalc(
+    measure = "SMD",
+    n1i = SAMPLE_SIZE_HC,
+    n2i = SAMPLE_SIZE_SZ,
+    m1i = PITCH_F0_HC_M,
+    m2i = PITCH_F0_SZ_M,
+    sd1i = PITCH_F0_HC_SD,
+    sd2i = PITCH_F0_SZ_SD,
+    data = df
+  )
 
 # It can be seen here
-test <- WM_d %>% select(StudyID,yi,vi,PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0_HC_SD,PITCH_F0_SZ_SD)
+test <-
+  WM_d %>% select(StudyID,
+                  yi,
+                  vi,
+                  PITCH_F0_HC_M,
+                  PITCH_F0_SZ_M,
+                  PITCH_F0SD_HC_M,
+                  PITCH_F0SD_SZ_M)
 
 ```
 
 # MODELLING BEFORE ADDING STUDIES FROM ASSIGNMENT 3
 ```{r}
 # Making a mixed effects implementation
-m <- lmer(yi ~ 1 + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore")) #Model may not have converged with 1 eigenvalue close to zero: 7.2e-10
+m <-
+  lmer( yi ~ 1 + (1 | StudyID),
+        weights = 1 / vi,
+        data = WM_d,
+        control = lmerControl(check.nobs.vs.nlev = "ignore", check.nobs.vs.nRE = "ignore")
+        ) #Model may not have converged with 1 eigenvalue close to zero: 7.2e-10
 
 summary(m)
 
 # A Meta-analysis optimization:
-m2 <-rma(yi, vi, data = WM_d, slab = Article) # Slab = random effect. Put here as Article to get the authors names instead of just numbers.
+m2 <- rma(yi, vi, data = WM_d, slab = Article) # Slab = random effect. Put here as Article to get the authors names instead of just numbers
 
 summary(m2)
 
 # Making a forest and funnel plot
 forest(m2)
-funnel(m2)
+funnel(x = m2, back = 'DarkGreen', shade = 'lightGreen') # Christmas colors
 
 # Checking publication bias with ranktest
 ranktest(m2)
 
 # What if we have a fixed effect?
-m3 <- lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
+m3 <-
+  lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID),
+       weights = 1 / vi,
+       data = WM_d,
+       control = lmerControl(check.nobs.vs.nlev = "ignore", check.nobs.vs.nRE = "ignore")
+       )
 
 summary(m3)
 
@@ -96,53 +122,108 @@ summary(m3)
 
 # ADDING STUDIES FROM ASSIGNMENT 3: 
 ```{r}
+# Making a placeholder dataframe of same dimensions
+new <- data.frame(matrix(NA, nrow = 4, ncol = 147))
 
-# CODE
-# ADD TO DF OR MAKE NEW (define new either way)
+# Filtering study 1-4 - the Danish ones from assignment 3
+olddf <- read_csv('pitch_data.csv') %>% filter(Study == 1:4) %>% mutate(Diagnosis = as.factor(Diagnosis),
+                                               Study = as.factor(Study),
+                                               Subject = as.factor(Subject))
+
+# Finding the information we need
+olddf %>% group_by(Study, Diagnosis) %>% 
+  summarise(meanF0 = mean(Mean),
+            SDF0 = sd(Mean),
+            SampleSize = n_distinct(Subject)
+            )
+
+colnames(new) = colnames(df)
+
+# Adding it - manually
+new$ArticleID = c(49, 50, 51, 52)
+
+new$StudyID = c(51, 52, 53, 54)
+
+new$Authors = c('Unknown1', 'Unknown2', 'Unknown3', 'Unknown4')
+
+new$PITCH_F0_HC_M = c(158.2903, 148.5101, 157.8653, 184.3483)
+
+new$PITCH_F0_SZ_M = c(161.9296, 138.4026, 159.9390, 149.7430)
+
+new$PITCH_F0_HC_SD = c(53.05387, 43.55323, 48.43903, 100.92741)
+
+new$PITCH_F0_SZ_SD = c(50.92881, 38.08752, 47.32662, 52.94836)
+
+new$SAMPLE_SIZE_HC = c(36, 23, 29, 29)
+
+new$SAMPLE_SIZE_SZ = c(34, 23, 19, 29)
+
+new$Article = c('A3P2 - Study 1', 'A3P2 - Study 2', 'A3P2 - Study 3', 'A3P2 - Study 4')
+
+# The new dataframe is then the 6 studies plus the new 4 studies from Assignment 3:
+new_df <- rbind(df, new)
 
 ```
 
 # GETTING STANDARDIZED MEAN DIFFERENCE (EFFECT SIZES) W. MORE STUDIES
 ```{r}
 # Creating effect size and sampling variance columns using escalc
-WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0_HC_SD, sd2i = PITCH_F0_SZ_SD, data = df)
+WM_d2 <-
+  escalc(
+    measure = "SMD",
+    n1i = SAMPLE_SIZE_HC,
+    n2i = SAMPLE_SIZE_SZ,
+    m1i = PITCH_F0_HC_M,
+    m2i = PITCH_F0_SZ_M,
+    sd1i = PITCH_F0_HC_SD,
+    sd2i = PITCH_F0_SZ_SD,
+    data = new_df
+  )
 
-# The new effect sizes can be seen here
-test <- WM_d %>% select(StudyID,yi,vi,PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0_HC_SD,PITCH_F0_SZ_SD)
+# The new dataframe and effect sizes can be seen here
+test2 <-
+  WM_d2 %>% select(StudyID,
+                  yi,
+                  vi,
+                  PITCH_F0_HC_M,
+                  PITCH_F0_SZ_M,
+                  PITCH_F0_HC_SD,
+                  PITCH_F0_SZ_SD)
 
 ```
-
 
 # MODELLING AFTER ADDING STUDIES FROM ASSIGNMENT 3
 ```{r}
-
 # Making a mixed effects implementation
-m <- lmer(yi ~ 1 + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore")) #Model may not have converged with 1 eigenvalue close to zero: 7.2e-10
-
-summary(m)
-
-# A Meta-analysis optimization:
-m2 <-rma(yi, vi, data = WM_d, slab = Article) # Slab = random effect. Put here as Article to get the authors names instead of just numbers.
+m2 <-
+  lmer( yi ~ 1 + (1 | StudyID),
+        weights = 1 / vi,
+        data = WM_d2,
+        control = lmerControl(check.nobs.vs.nlev = "ignore", check.nobs.vs.nRE = "ignore")
+        ) #Model may not have converged with 1 eigenvalue close to zero: 7.2e-10
 
 summary(m2)
 
+# A Meta-analysis optimization:
+m22 <- rma(yi, vi, data = WM_d2, slab = Article) 
+
+summary(m22)
+
 # Making a forest and funnel plot
-forest(m2)
-funnel(m2)
+forest(m22)
+funnel(x = m22, back = 'DarkRed', shade = 'pink', col = 'Black') # Christmas colors
 
 # Checking publication bias with ranktest
-ranktest(m2)
+ranktest(m22)
 
 # What if we have a fixed effect?
-m3 <- lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID), weights = 1/vi, data=WM_d, control=lmerControl(check.nobs.vs.nlev="ignore", check.nobs.vs.nRE="ignore"))
+m32 <-
+  lmer(yi ~ 1 + TYPE_OF_TASK + (1 | StudyID),
+       weights = 1 / vi,
+       data = WM_d2,
+       control = lmerControl(check.nobs.vs.nlev = "ignore", check.nobs.vs.nRE = "ignore")
+       ) #Model failed to converge: degenerate  Hessian with 1 negative eigenvalues
 
-summary(m3)
-
+summary(m32)
 
 ```
-
-
-
-
-
-
