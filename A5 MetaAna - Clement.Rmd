@@ -71,6 +71,7 @@ summary(model_mean);summary(model_SD)
 # Creating effect size and sampling variance columns using escalc
 WM_d <- escalc(measure = "SMD", n1i = SAMPLE_SIZE_HC, n2i = SAMPLE_SIZE_SZ, m1i = PITCH_F0_HC_M, m2i = PITCH_F0_SZ_M, sd1i = PITCH_F0SD_HC_M, sd2i = PITCH_F0SD_SZ_M, data = df) #Standardized mean difference "SMD"
 
+?escalc
 
 # We can only get effect size estimates from 2 studies - study 1 and 50, because they are the only rows where there are both the means and the sd values: (complete)
 test <- WM_d %>% select(StudyID,yi,vi,PITCH_F0_HC_M,PITCH_F0_SZ_M,PITCH_F0SD_HC_M,PITCH_F0SD_SZ_M)
@@ -93,7 +94,7 @@ summary(m)
 
 #Meta-analysis optimization:
 # The rma tells R that you want to do a random effects meta-analysis 
-m2 <-rma(yi, vi, data = WM_d, slab = StudyID) # Slab = random effect
+m2 <-rma(yi, vi, data = WM_d, slab = Article) # Slab = random effect
 
 funnel(m2)
 forest(m2)
@@ -126,5 +127,37 @@ Prisma chart: https://www.dropbox.com/s/vbjf6ff73dv9tru/PRISMA%202009%20flow%20d
 - Build a forest plot of the results (forest(model))
  
 - Go back to Assignment 3, add your own study to the data table, and re-run meta-analysis. Do the results change?
+```{r}
+pitch_data <- read_csv("C:/Users/cleme/Desktop/3. Semester CogSci/Exp Meth 3/Portfolios/Portfolio 2/A3-P2/pitch_data.csv")
+
+danish_data <- pitch_data %>% 
+  filter(study == 1 | study == 2 | study == 3 | study == 4)
+
+
+SAMPLE_SIZE_HC
+SAMPLE_SIZE_SZ
+PITCH_F0_HC_M
+PITCH_F0_SZ_M
+PITCH_F0_HC_SD
+PITCH_F0_SZ_SD
+danish_data$diagnosis <- as.factor(danish_data$diagnosis)
+danish_data$study <- as.factor(danish_data$study)
+
+small_meta <- danish_data %>% 
+  group_by(study, diagnosis) %>% 
+  summarise(PITCH_F0_M = mean(mean),
+            PITCH_F0SD = sd(mean))
+            
+small_meta2 <- c(, , "PITCH_F0SD_HC", "PITCH_F0SD_SZ", "SAMPLE_SIZE_HC", "SAMPLE_SIZE_SZ"))
+
+
+small_meta <- small_meta %>%
+  mutate(PITCH_F0_HC_M = PITCH_F0_M | diagnosis == 0)
+
+danish_data %>% 
+  unique(subject)
+```
+
+
 
 - Now look at the output of rma() and check tau and I2
