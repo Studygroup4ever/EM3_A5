@@ -39,6 +39,8 @@ Prisma chart: https://www.dropbox.com/s/vbjf6ff73dv9tru/PRISMA%202009%20flow%20d
 
 - Now look at the output of rma() and check tau and I2
 
+# This part of the code was written CB
+
 # SETUP and LOAD-IN
 ```{r}
 # Setup
@@ -86,6 +88,8 @@ test <-
 
 ```
 
+# This part of the code was written by SOH
+
 # MODELLING BEFORE ADDING STUDIES FROM ASSIGNMENT 3
 ```{r}
 # Making a mixed effects implementation
@@ -121,6 +125,8 @@ m3 <-
 summary(m3)
 
 ```
+
+# This part of the code was written by PB
 
 # ADDING STUDIES FROM ASSIGNMENT 3: 
 ```{r}
@@ -164,6 +170,8 @@ new_df <- rbind(df, new)
 
 ```
 
+# This part of the code was written by KK
+
 # GETTING STANDARDIZED MEAN DIFFERENCE (EFFECT SIZES) W. MORE STUDIES
 ```{r}
 # Creating effect size and sampling variance columns using escalc
@@ -190,6 +198,8 @@ test2 <-
                   PITCH_F0_SZ_SD)
 
 ```
+
+# This part of the code was written by JJ
 
 # MODELLING AFTER ADDING STUDIES FROM ASSIGNMENT 3
 ```{r}
@@ -227,6 +237,7 @@ summary(m32)
 
 ```
 #FINDING INFLUENTIAL STUDIES
+
 ```{r}
 # Influential points on the meta analysis without our studies
 inf1<- influence(m2)
